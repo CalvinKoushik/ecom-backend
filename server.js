@@ -1,3 +1,95 @@
+require("dotenv").config();
+const express = require("express");
+const Razorpay = require("razorpay");
+const cors = require("cors");
+const crypto = require("crypto");
+const axios = require("axios");
+
+const app = express();
+
+app.use(cors({
+  origin: [
+    "http://localhost:5173",
+    "https://iot-haven.vercel.app"
+  ],
+  methods: ["GET", "POST"],
+}));
+
+app.use(express.json());
+
+/* -------------------- Razorpay -------------------- */
+
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
+
+/* -------------------- Shiprocket -------------------- */
+
+let shiprocketToken = null;
+let tokenExpiry = null;
+
+async function getShiprocketToken() {
+  if (shiprocketToken && tokenExpiry > Date.now()) {
+    return shiprocketToken;
+  }
+
+  const response = await axios.post(
+    "https://apiv2.shiprocket.in/v1/external/auth/login",
+    {
+      email: process.env.SHIPROCKET_EMAIL,
+      password: process.env.SHIPROCKET_PASSWORD,
+    }
+  );
+
+  shiprocketToken = response.data.token;
+  tokenExpiry = Date.now() + 8 * 60 * 60 * 1000; // 8 hours
+
+  return shiprocketToken;
+}
+
+async function createShiprocketOrder(orderData) {
+  const token = await getShiprocketToken();
+
+  const response = await axios.post(
+    "https://apiv2.shiprocket.in/v1/external/orders/create/adhoc",
+    orderData,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  return response.data;
+}
+
+/* -------------------- Routes -------------------- */
+
+app.post("/create-order", async (req, res) => {
+  try {
+    const { amount } = req.body;
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ error: "Invalid amount" });
+    }
+
+    const order = await razorpay.orders.create({
+      amount: amount * 100,
+      currency: "INR",
+      receipt: "receipt_" + Date.now(),
+    });
+
+    res.json(order);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Order creation failed" });
+  }
+});
+
+/* 🔥 SINGLE SECURE CHECKOUT ROUTE */
 app.post("/checkout", async (req, res) => {
   try {
     const {
@@ -70,3 +162,10 @@ app.post("/checkout", async (req, res) => {
     });
   }
 });
+
+app.get("/", (req, res) => {
+  res.json({ status: "Backend running 🚀" });
+});
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log("Server running on port " + PORT));
