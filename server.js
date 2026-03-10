@@ -120,30 +120,38 @@ app.post("/checkout", async (req, res) => {
 
     /* 🚀 2️⃣ Create Shipment (For BOTH COD & Prepaid) */
     const shiprocketPayload = {
-      order_id: orderDetails.order_number,
-      order_date: new Date().toISOString().split("T")[0],
-      pickup_location: "Primary",
+  order_id: orderDetails.order_number,
+  order_date: new Date().toISOString().split("T")[0],
 
-      billing_customer_name: orderDetails.full_name,
-      billing_address: orderDetails.address_line,
-      billing_city: orderDetails.city,
-      billing_pincode: orderDetails.pincode,
-      billing_state: orderDetails.state,
-      billing_country: "India",
-      billing_email: orderDetails.email,
-      billing_phone: orderDetails.phone,
+  pickup_location: "warehouse",
 
-      shipping_is_billing: true,
-      order_items: orderDetails.items,
+  billing_customer_name: orderDetails.full_name,
+  billing_last_name: ".",        // <-- FIX
+  billing_address: orderDetails.address_line,
+  billing_city: orderDetails.city,
+  billing_pincode: orderDetails.pincode,
+  billing_state: orderDetails.state,
+  billing_country: "India",
+  billing_email: orderDetails.email,
+  billing_phone: orderDetails.phone,
 
-      payment_method: paymentMethod === "cod" ? "COD" : "Prepaid",
-      sub_total: orderDetails.total,
+  shipping_is_billing: true,
 
-      length: 10,
-      breadth: 10,
-      height: 10,
-      weight: 0.5,
-    };
+  order_items: orderDetails.items.map(item => ({
+    name: item.name,
+    sku: String(item.sku),
+    units: item.units,
+    selling_price: item.selling_price
+  })),
+
+  payment_method: paymentMethod === "cod" ? "COD" : "Prepaid",
+  sub_total: orderDetails.total,
+
+  length: 10,
+  breadth: 10,
+  height: 10,
+  weight: 0.5
+};
 
     const shipment = await createShiprocketOrder(shiprocketPayload);
 
