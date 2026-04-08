@@ -9,9 +9,15 @@ const app = express();
 
 app.use(cors({
   origin: "*",
-  methods: ["GET", "POST"],
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
 app.use(express.json());
+
+// Log to verify the backend is actually loading keys (safe check)
+console.log("RAZORPAY_KEY_ID exists:", !!process.env.RAZORPAY_KEY_ID);
+console.log("SHIPROCKET_EMAIL exists:", !!process.env.SHIPROCKET_EMAIL);
+
 
 /* -------------------- Razorpay -------------------- */
 
@@ -160,9 +166,24 @@ app.post("/checkout", async (req, res) => {
 
   } catch (err) {
     console.error(err.response?.data || err);
+    let errorMessage = "Checkout failed";
+    
+    // Extract exact Shiprocket/Razorpay error
+    if (err.response && err.response.data) {
+      if (typeof err.response.data.message === "string") {
+        errorMessage = err.response.data.message;
+      } else if (err.response.data.error) {
+        errorMessage = err.response.data.error;
+      } else {
+        errorMessage = JSON.stringify(err.response.data);
+      }
+    } else if (err.message) {
+      errorMessage = err.message;
+    }
+
     res.status(500).json({
       success: false,
-      message: "Checkout failed"
+      message: errorMessage
     });
   }
 });
